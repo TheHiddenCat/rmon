@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>rmon</title>
+    <style>
+        body {
+            background-color: #222222;
+            margin: 10px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .grid-container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 300px 300px 300px;
+        }
+
+        .bar {
+            background: rgb(31, 82, 46);
+            color: white;
+            text-align: center;
+            margin: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .bar label {
+            z-index: 2;
+        }
+
+        .bar .bar-inner {
+            z-index: 1;
+            background: rgb(41, 151, 74);
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+	        transition: width 0.2s;
+        }
+
+        .process-memory {
+            text-align: right;
+        }
+
+        .process-cpu {
+            text-align: right;
+        }
+
+        .text-white {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <script defer>
+        const source = new EventSource("api/sse");
+        source.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const cpus = document.getElementById("cpus");
+            const memory = document.getElementById("memory").children[0];
+            const processes = document.getElementById("processes");
+
+            // CPU
+            while (cpus.lastElementChild) {
+                cpus.removeChild(cpus.lastElementChild);
+            }
+
+            for(const cpu of data.cpu) {
+                const bar = document.createElement("div");
+                bar.classList.add("bar");
+
+                const inner = document.createElement("div");
+                inner.classList.add("bar-inner");
+                inner.style.width = `${cpu}%`;
+
+                const label = document.createElement("label");
+                label.innerText = `${cpu.toFixed(2)}%`;
+
+                bar.appendChild(inner);
+                bar.appendChild(label);
+
+                cpus.appendChild(bar);
+            }
+
+            // Memory
+            const bytesToGb = (x) => x / (1024*1024*1024);
+            const bytesToMb = (x) => x / (1024*1024);
+            const memPercentage = (data.ram.used/data.ram.total*100).toFixed(2);
+            memory.children[0].style.width = `${memPercentage}%`;
+            memory.children[1].innerText = `${bytesToGb(data.ram.used).toFixed(1)} GB / ${bytesToGb(data.ram.total).toFixed(1)} GB (${memPercentage}%)`;
+
+            // Processes
+            while (processes.lastElementChild) {
+                processes.removeChild(processes.lastElementChild);
+            }
+
+            for (const process of data.processes) {
+                const processName = document.createElement("div");
+                processName.innerText = process.name;
+
+                const processCpu = document.createElement("div");
+                processCpu.classList.add("process-cpu");
+                processCpu.innerText = `${process.cpu.toFixed(2)}%`;
+
+                const processMemory = document.createElement("div");
+                processMemory.classList.add("process-memory");
+                processMemory.innerText = `${bytesToMb(process.memory).toFixed(2)} MB`;
+
+                processes.appendChild(processName);
+                processes.appendChild(processCpu);
+                processes.appendChild(processMemory);
+            }
+        }; 
+    </script>
+    
+    <main>
+        <div class="grid-container">
+            <h5 class="text-white">Cpu</h5>
+        </div>
+        <div id="cpus" class="grid-container"><em>Loading...</em></div>
+        <div class="grid-container">
+            <h5 class="text-white">Memory</h5>
+        </div>
+        <div id="memory" class="container">
+            <div class="bar mt-30">
+                <div class="bar-inner"></div>
+                <label>0.0GB / 0.0GB</label>
+            </div>
+        </div>
+        <div class="grid-container">
+            <h5 class="text-white">Process</h5>
+            <h5 class="text-white process-cpu">Cpu usage</h5>
+            <h5 class="text-white process-memory">Memory usage</h5>
+        </div>
+        <div id="processes" class="grid-container text-white"><em>Loading...</em></div>
+    </main>
+</body>
+</html>
